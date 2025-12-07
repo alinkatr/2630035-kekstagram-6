@@ -1,4 +1,6 @@
 
+import { resetEditor } from './image-editor.js';
+
 const uploadForm = document.querySelector('#upload-select-image');
 const uploadFileInput = uploadForm.querySelector('#upload-file');
 const uploadOverlay = uploadForm.querySelector('.img-upload__overlay');
@@ -79,6 +81,8 @@ const closeUploadForm = () => {
   uploadForm.reset();
   uploadFileInput.value = '';
 
+  resetEditor();
+
   pristine.reset();
 
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -115,4 +119,4 @@ const initForm = () => {
   });
 };
 
-export { initForm };
+export { initForm, closeUploadForm };

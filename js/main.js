@@ -3,6 +3,7 @@ import {getRandomNumber, getPhotoId, getUrl, getCommentId, getRandomItem} from '
 import { renderPictures } from './pictures.js';
 import { initFullscreen } from './fullscreen.js';
 import { initForm } from './form.js';
+import { initImageEditor } from './image-editor.js';
 
 const createComments = () => ({
   id: getCommentId(),
@@ -24,4 +25,5 @@ const descriptionsPhoto = Array.from({length: DESCRIPTION_COUNT}, createDescript
 renderPictures(descriptionsPhoto);
 initFullscreen(descriptionsPhoto);
 initForm();
+initImageEditor();
 console.log(descriptionsPhoto);
