@@ -1,15 +1,11 @@
-
 const uploadForm = document.querySelector('#upload-select-image');
 const scaleControlValue = uploadForm.querySelector('.scale__control--value');
-const scaleControlSmaller = uploadForm.querySelector('.scale__control--smaller');
-const scaleControlBigger = uploadForm.querySelector('.scale__control--bigger');
 const imagePreview = uploadForm.querySelector('.img-upload__preview img');
 const effectLevelValue = uploadForm.querySelector('.effect-level__value');
 const effectLevelSlider = uploadForm.querySelector('.effect-level__slider');
 const effectsList = uploadForm.querySelector('.effects__list');
 const effectLevelContainer = uploadForm.querySelector('.img-upload__effect-level');
 
-const SCALE_STEP = 25;
 const SCALE_MIN = 25;
 const SCALE_MAX = 100;
 const DEFAULT_SCALE = 100;
@@ -59,25 +55,45 @@ const EFFECTS = {
 };
 
 let currentEffect = 'none';
-let currentScale = DEFAULT_SCALE;
+
+const createScaleSlider = () => {
+  const scaleSliderContainer = document.createElement('div');
+  scaleSliderContainer.className = 'scale__slider';
+
+  const scaleFieldset = uploadForm.querySelector('.scale');
+  scaleFieldset.appendChild(scaleSliderContainer);
+
+  noUiSlider.create(scaleSliderContainer, {
+    range: {
+      min: SCALE_MIN,
+      max: SCALE_MAX,
+    },
+    start: DEFAULT_SCALE,
+    step: 1,
+    connect: 'lower',
+    format: {
+      to: (value) => Math.round(value),
+      from: (value) => parseFloat(value),
+    },
+  });
+
+  scaleSliderContainer.noUiSlider.on('update', (values, handle) => {
+    const value = Math.round(values[handle]);
+    updateScale(value);
+  });
+
+  return scaleSliderContainer;
+};
+
+let scaleSlider;
 
 const updateScale = (value) => {
-  currentScale = value;
-  scaleControlValue.value = `${value}%`;
+  const percentage = `${value}%`;
+  scaleControlValue.value = percentage;
   imagePreview.style.transform = `scale(${value / 100})`;
 };
 
-const onScaleSmallerClick = () => {
-  const newValue = Math.max(currentScale - SCALE_STEP, SCALE_MIN);
-  updateScale(newValue);
-};
-
-const onScaleBiggerClick = () => {
-  const newValue = Math.min(currentScale + SCALE_STEP, SCALE_MAX);
-  updateScale(newValue);
-};
-
-const createSlider = () => {
+const createEffectSlider = () => {
   noUiSlider.create(effectLevelSlider, {
     range: {
       min: 0,
@@ -95,7 +111,7 @@ const createSlider = () => {
   effectLevelContainer.classList.add('hidden');
 };
 
-const updateSlider = (effect) => {
+const updateEffectSlider = (effect) => {
   const effectConfig = EFFECTS[effect];
 
   effectLevelSlider.noUiSlider.updateOptions({
@@ -108,7 +124,7 @@ const updateSlider = (effect) => {
   });
 };
 
-const onSliderUpdate = () => {
+const onEffectSliderUpdate = () => {
   const sliderValue = effectLevelSlider.noUiSlider.get();
   effectLevelValue.value = sliderValue;
 
@@ -127,15 +143,17 @@ const onEffectChange = (evt) => {
     if (currentEffect === 'none') {
       imagePreview.style.filter = 'none';
       effectLevelContainer.classList.add('hidden');
+      effectLevelValue.value = '';
     } else {
       effectLevelContainer.classList.remove('hidden');
-      updateSlider(currentEffect);
-      onSliderUpdate();
+      updateEffectSlider(currentEffect);
+      onEffectSliderUpdate();
     }
   }
 };
 
 const resetEditor = () => {
+  scaleSlider.noUiSlider.set(DEFAULT_SCALE);
   updateScale(DEFAULT_SCALE);
 
   const noneEffect = effectsList.querySelector('#effect-none');
@@ -144,6 +162,7 @@ const resetEditor = () => {
   imagePreview.className = '';
   imagePreview.style.filter = 'none';
   effectLevelContainer.classList.add('hidden');
+  effectLevelValue.value = '';
 
   if (effectLevelSlider.noUiSlider) {
     effectLevelSlider.noUiSlider.updateOptions({
@@ -153,14 +172,11 @@ const resetEditor = () => {
 };
 
 const initImageEditor = () => {
+  scaleSlider = createScaleSlider();
   updateScale(DEFAULT_SCALE);
-  scaleControlSmaller.addEventListener('click', onScaleSmallerClick);
-  scaleControlBigger.addEventListener('click', onScaleBiggerClick);
 
-
-  createSlider();
-  effectLevelSlider.noUiSlider.on('update', onSliderUpdate);
-
+  createEffectSlider();
+  effectLevelSlider.noUiSlider.on('update', onEffectSliderUpdate);
 
   effectsList.addEventListener('change', onEffectChange);
 };

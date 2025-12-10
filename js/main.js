@@ -1,3 +1,9 @@
+// Убедитесь, что noUiSlider доступен глобально
+if (typeof noUiSlider === 'undefined') {
+  console.error('noUiSlider не загружен. Проверьте подключение библиотеки.');
+}
+
+// Остальной код остается таким же...
 import {MESSAGES, DESCRIPTIONS, NAMES, DESCRIPTION_COUNT} from './data.js';
 import {getRandomNumber, getPhotoId, getUrl, getCommentId, getRandomItem} from './util.js';
 import { renderPictures } from './pictures.js';
@@ -12,7 +18,6 @@ const createComments = () => ({
   name: getRandomItem(NAMES)
 });
 
-
 const createDescriptionPhoto = () => ({
   id: getPhotoId(),
   url: `photos/${getUrl()}.jpg`,
@@ -26,4 +31,3 @@ renderPictures(descriptionsPhoto);
 initFullscreen(descriptionsPhoto);
 initForm();
 initImageEditor();
-console.log(descriptionsPhoto);
