@@ -1,3 +1,5 @@
+import { isEscapeKey } from './util.js';
+
 const ALERT_SHOW_TIME = 5000;
 
 const showAlert = (message) => {
@@ -32,32 +34,50 @@ const showSuccessMessage = () => {
   const successElement = successTemplate.content.cloneNode(true);
   const successSection = successElement.querySelector('.success');
 
-  document.body.appendChild(successElement);
+  document.body.insertBefore(successElement, document.body.lastElementChild.nextSibling);
+
   const successButton = document.querySelector('.success__button');
 
+  successSection.style.position = 'fixed';
+  successSection.style.inset = '0';
+  successSection.style.zIndex = '10000';
+
+
   const onSuccessClick = (evt) => {
-    if (evt.target === successSection || evt.target === successButton) {
+    if (evt.target === successSection) {
       closeSuccessMessage();
     }
   };
 
+  const onSuccessButtonClick = () => {
+    closeSuccessMessage();
+  };
+
   const onSuccessKeydown = (evt) => {
-    if (evt.key === 'Escape') {
+    if (isEscapeKey(evt)) {
       closeSuccessMessage();
     }
   };
 
   const closeSuccessMessage = () => {
-    successSection.remove();
+    if (successSection && successSection.parentNode) {
+      successSection.parentNode.removeChild(successSection);
+    }
     document.removeEventListener('keydown', onSuccessKeydown);
     successSection.removeEventListener('click', onSuccessClick);
+    if (successButton) {
+      successButton.removeEventListener('click', onSuccessButtonClick);
+    }
   };
 
   document.addEventListener('keydown', onSuccessKeydown);
   successSection.addEventListener('click', onSuccessClick);
+  if (successButton) {
+    successButton.addEventListener('click', onSuccessButtonClick);
+  }
 };
 
-const showErrorMessage = (onRetry) => {
+const showErrorMessage = () => {
   const errorTemplate = document.querySelector('#error');
   if (!errorTemplate) {
     return;
@@ -65,34 +85,39 @@ const showErrorMessage = (onRetry) => {
 
   const errorElement = errorTemplate.content.cloneNode(true);
   const errorSection = errorElement.querySelector('.error');
+  const errorInner = errorElement.querySelector('.error__inner');
+  const errorButton = errorElement.querySelector('.error__button');
 
-  document.body.appendChild(errorElement);
-  const errorButton = document.querySelector('.error__button');
+  errorSection.style.position = 'fixed';
+  errorSection.style.inset = '0';
+  errorSection.style.zIndex = '10000';
 
-  const onErrorClick = (evt) => {
-    if (evt.target === errorSection || evt.target === errorButton) {
-      closeErrorMessage();
+  const onDocumentKeydown = (evt) => {
+    if (isEscapeKey(evt)) {
+      evt.preventDefault();
+      closeError();
     }
   };
 
-  const onErrorKeydown = (evt) => {
-    if (evt.key === 'Escape') {
-      closeErrorMessage();
+  const onOutsideClick = (evt) => {
+    if (!errorInner.contains(evt.target)) {
+      closeError();
     }
   };
 
-  const closeErrorMessage = () => {
+  function closeError() {
+    document.removeEventListener('keydown', onDocumentKeydown);
+    errorSection.removeEventListener('click', onOutsideClick);
+    errorButton.removeEventListener('click', closeError);
     errorSection.remove();
-    document.removeEventListener('keydown', onErrorKeydown);
-    errorSection.removeEventListener('click', onErrorClick);
+  }
 
-    if (onRetry && typeof onRetry === 'function') {
-      onRetry();
-    }
-  };
+  errorButton.addEventListener('click', closeError);
+  document.addEventListener('keydown', onDocumentKeydown);
+  errorSection.addEventListener('click', onOutsideClick);
 
-  document.addEventListener('keydown', onErrorKeydown);
-  errorSection.addEventListener('click', onErrorClick);
+  document.body.append(errorSection);
 };
+
 
 export { showAlert, showSuccessMessage, showErrorMessage };

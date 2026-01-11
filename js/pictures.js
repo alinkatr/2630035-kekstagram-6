@@ -16,7 +16,7 @@ const createPictureElement = (photo) => {
   if (photo.effect && photo.effect !== 'none') {
     pictureImage.classList.add(`effects__preview--${photo.effect}`);
 
-    if (photo.effect_level) {
+    if (photo.effect_level !== undefined && photo.effect_level !== null) {
       let filter = '';
       switch (photo.effect) {
         case 'chrome':

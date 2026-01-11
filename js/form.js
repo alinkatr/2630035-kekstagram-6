@@ -1,5 +1,5 @@
-import { resetEditor } from './image-editor.js';
-import { sendData } from './api.js';
+import { resetEditor, setEffect } from './image-editor.js';
+import { sendData, checkServerAvailability  } from './api.js';
 import { showSuccessMessage, showErrorMessage } from './messages.js';
 import { isEscapeKey } from './util.js';
 
@@ -14,6 +14,8 @@ const uploadPreview = uploadForm.querySelector('.img-upload__preview img');
 const effectsPreview = uploadForm.querySelectorAll('.effects__preview');
 const scaleControl = uploadForm.querySelector('.scale__control--value');
 const effectLevel = uploadForm.querySelector('.effect-level__value');
+const scaleSmallerButton = uploadForm.querySelector('.scale__control--smaller');
+const scaleBiggerButton = uploadForm.querySelector('.scale__control--bigger');
 const body = document.body;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -23,6 +25,108 @@ const pristine = new Pristine(uploadForm, {
   errorTextParent: 'img-upload__field-wrapper',
   errorTextClass: 'img-upload__field-wrapper--error'
 }, true);
+
+let pendingFormState = null;
+
+const saveFormState = () => {
+  if (!uploadFileInput.files || uploadFileInput.files.length === 0) {
+    return null;
+  }
+
+  const file = uploadFileInput.files[0];
+  const reader = new FileReader();
+
+  return new Promise((resolve) => {
+    reader.onload = (evt) => {
+      const state = {
+        file: {
+          name: file.name,
+          type: file.type,
+          data: evt.target.result,
+        },
+        scale: getCurrentScale(),
+        effect: getCurrentEffect(),
+        effectLevel: getCurrentEffectLevel(),
+        hashtags: hashtagInput.value,
+        comment: commentInput.value,
+        timestamp: Date.now(),
+      };
+      resolve(state);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const restoreFormState = (state) => {
+  if (!state) return;
+
+  const byteString = atob(state.file.data.split(',')[1]);
+  const mimeString = state.file.data.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+
+  const blob = new Blob([ab], { type: mimeString });
+  const file = new File([blob], state.file.name, { type: state.file.type });
+
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(file);
+  uploadFileInput.files = dataTransfer.files;
+
+  loadAndShowPhoto(file);
+
+  updateScale(parseInt(state.scale, 10));
+
+  const effectInput = uploadForm.querySelector(`input[value="${state.effect}"]`);
+  if (effectInput) {
+    effectInput.checked = true;
+    effectInput.dispatchEvent(new Event('change'));
+  }
+
+  if (state.effect !== 'none' && state.effectLevel) {
+    setTimeout(() => {
+      const effectLevelSlider = uploadForm.querySelector('.effect-level__slider');
+      if (effectLevelSlider && effectLevelSlider.noUiSlider) {
+        effectLevelSlider.noUiSlider.set(parseFloat(state.effectLevel));
+      }
+    }, 100);
+  }
+
+  hashtagInput.value = state.hashtags || '';
+  commentInput.value = state.comment || '';
+
+  pristine.reset();
+};
+
+
+
+const updateScale = (value) => {
+  const percentage = `${value}%`;
+
+  if (scaleControl) {
+    scaleControl.value = percentage;
+  }
+
+  if (uploadPreview) {
+    uploadPreview.style.transform = `scale(${value / 100})`;
+  }
+};
+
+
+const onScaleSmallerClick = () => {
+  const currentValue = parseInt(scaleControl.value, 10);
+  const newValue = Math.max(currentValue - 25, 25);
+  updateScale(newValue);
+};
+
+const onScaleBiggerClick = () => {
+  const currentValue = parseInt(scaleControl.value, 10);
+  const newValue = Math.min(currentValue + 25, 100);
+  updateScale(newValue);
+};
 
 const createProcessedImage = async (imageElement) => {
   return new Promise((resolve, reject) => {
@@ -252,7 +356,10 @@ const resetForm = () => {
 
   pristine.reset();
   resetEditor();
+
+  updateScale(100);
 };
+
 
 let updatePhotosCallback = null;
 
@@ -262,7 +369,7 @@ const addNewPhotoToGallery = (photoData) => {
   }
 };
 
-const openUploadForm = () => {
+const openUploadForm = (restoreState = null) => {
   uploadOverlay.classList.remove('hidden');
   body.classList.add('modal-open');
 
@@ -272,20 +379,34 @@ const openUploadForm = () => {
 
   hashtagInput.addEventListener('keydown', onInputKeydown);
   commentInput.addEventListener('keydown', onInputKeydown);
+
+  if (restoreState) {
+    setTimeout(() => {
+      restoreFormState(restoreState);
+    }, 100);
+  }
 };
 
-const closeUploadForm = () => {
-  uploadOverlay.classList.add('hidden');
-  body.classList.remove('modal-open');
 
-  resetForm();
+const closeUploadForm = (saveState = false) => {
+  if (saveState && pendingFormState) {
+    uploadOverlay.classList.add('hidden');
+    body.classList.remove('modal-open');
+  } else {
+    uploadOverlay.classList.add('hidden');
+    body.classList.remove('modal-open');
+    resetForm();
+    pendingFormState = null;
+  }
 
   document.removeEventListener('keydown', onDocumentKeydown);
   uploadCancel.removeEventListener('click', onCancelClick);
   uploadForm.removeEventListener('submit', onFormSubmit);
+
   hashtagInput.removeEventListener('keydown', onInputKeydown);
   commentInput.removeEventListener('keydown', onInputKeydown);
 };
+
 
 const getCurrentEffect = () => {
   const checkedEffect = uploadForm.querySelector('input[name="effect"]:checked');
@@ -317,6 +438,10 @@ const onFormSubmit = async (evt) => {
   blockSubmitButton();
 
   try {
+    pendingFormState = await saveFormState();
+
+    const isServerAvailable = await checkServerAvailability();
+
     const processedImage = await createProcessedImage(uploadPreview);
 
     const formData = new FormData();
@@ -328,7 +453,7 @@ const onFormSubmit = async (evt) => {
     const currentEffect = getCurrentEffect();
     if (currentEffect !== 'none') {
       const effectLevelValue = getCurrentEffectLevel();
-      if (effectLevelValue) {
+      if (effectLevelValue !== '') {
         formData.append('effect_level', effectLevelValue);
       }
     }
@@ -344,7 +469,10 @@ const onFormSubmit = async (evt) => {
       formData.append('hashtags', hashtagsValue);
     }
 
-    await sendData(formData);
+    const effect = getCurrentEffect();
+    const rawLevel = getCurrentEffectLevel();
+
+    const effectLevelNumber = rawLevel === '' ? null : Number(rawLevel);
 
     const newPhoto = {
       id: Date.now(),
@@ -353,32 +481,50 @@ const onFormSubmit = async (evt) => {
       likes: 0,
       comments: [],
       scale: processedImage.scale,
-      effect: getCurrentEffect(),
-      effect_level: getCurrentEffectLevel()
+      effect,
+      effect_level: Number.isFinite(effectLevelNumber) ? effectLevelNumber : null,
+      isPending: true,
+      pendingId: `local_${Date.now()}`
     };
 
-    addNewPhotoToGallery(newPhoto);
+    if (isServerAvailable) {
+      try {
+        await sendData(formData, newPhoto);
 
-    showSuccessMessage();
+        addNewPhotoToGallery({
+          ...newPhoto,
+          isPending: false
+        });
 
-    closeUploadForm();
+        showSuccessMessage();
+        closeUploadForm(false);
+        pendingFormState = null;
+
+      } catch (error) {
+        showErrorMessage();
+        unblockSubmitButton();
+      }
+    } else {
+      showErrorMessage();
+      unblockSubmitButton();
+      return;
+    }
 
     unblockSubmitButton();
 
   } catch (error) {
-    console.error('Ошибка при отправке формы:', error);
-    showErrorMessage(() => {
-      uploadOverlay.classList.remove('hidden');
-      body.classList.add('modal-open');
-      unblockSubmitButton();
-    });
+    showErrorMessage();
+  } finally {
+    unblockSubmitButton();
   }
 };
 
 
 const onCancelClick = () => {
-  closeUploadForm();
+  closeUploadForm(false);
+  pendingFormState = null;
 };
+
 
 const onDocumentKeydown = (evt) => {
   if (isEscapeKey(evt) && !hashtagInput.matches(':focus') && !commentInput.matches(':focus')) {
@@ -396,6 +542,9 @@ const onInputKeydown = (evt) => {
 const initForm = (callback) => {
   updatePhotosCallback = callback;
   uploadFileInput.addEventListener('change', onFileInputChange);
+
+  updateScale(100);
 };
+
 
 export { initForm, closeUploadForm };

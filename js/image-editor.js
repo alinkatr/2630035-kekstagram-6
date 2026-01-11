@@ -202,4 +202,40 @@ const initImageEditor = () => {
   observer.observe(imagePreview, { attributes: true });
 };
 
-export { initImageEditor, resetEditor, updateEffectsPreview };
+const setEffect = (effect, level = null) => {
+  const effectInput = uploadForm.querySelector(`input[value="${effect}"]`);
+  if (effectInput) {
+    effectInput.checked = true;
+    currentEffect = effect;
+
+    imagePreview.className = '';
+    imagePreview.classList.add(`effects__preview--${effect}`);
+
+    if (effect === 'none') {
+      imagePreview.style.filter = 'none';
+      effectLevelContainer.classList.add('hidden');
+    } else {
+      effectLevelContainer.classList.remove('hidden');
+      updateEffectSlider(effect);
+
+      if (level !== null && effectLevelSlider.noUiSlider) {
+        effectLevelSlider.noUiSlider.set(level);
+        effectLevelValue.value = level;
+
+        const effectConfig = EFFECTS[effect];
+        imagePreview.style.filter = `${effectConfig.filter}(${level}${effectConfig.unit})`;
+      }
+    }
+  }
+};
+
+
+export {
+  initImageEditor,
+  resetEditor,
+  updateEffectsPreview,
+  onScaleSmallerClick,
+  onScaleBiggerClick,
+  setEffect
+};
+

@@ -104,7 +104,7 @@ const openBigPicture = (photoId) => {
   if (photo.effect && photo.effect !== 'none') {
     bigPictureImage.classList.add(`effects__preview--${photo.effect}`);
 
-    if (photo.effect_level) {
+    if (photo.effect_level !== undefined && photo.effect_level !== null) {
       const filter = getEffectFilter(photo.effect, photo.effect_level);
       if (filter !== 'none') {
         bigPictureImage.style.filter = filter;

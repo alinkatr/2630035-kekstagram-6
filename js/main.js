@@ -34,20 +34,24 @@ const loadPhotos = async () => {
     renderPictures(photos);
     initFullscreen(photos);
 
-    filters = new Filters();
-    filters.init(photos, onFilterChange);
-
-    initForm(updatePhotos);
+    if (photos.length > 0) {
+      filters = new Filters();
+      filters.init(photos, onFilterChange);
+    }
 
   } catch (error) {
-    showAlert(error.message);
+    showAlert('Ошибка загрузки фотографий. Работаем в локальном режиме.');
     console.error('Ошибка загрузки фотографий:', error);
+    photos = [];
+  } finally {
+    initForm(updatePhotos);
   }
 };
 
 const initApp = () => {
-  loadPhotos();
   initImageEditor();
+
+  loadPhotos();
 };
 
 document.addEventListener('click', (evt) => {
